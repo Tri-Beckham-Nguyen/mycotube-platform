@@ -1,0 +1,19 @@
+# Research data and derived artifacts - never publish
+runs/
+data/
+Data/
+*.csv
+*.joblib
+*.pkl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+settings.json

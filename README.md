@@ -53,7 +53,8 @@ than reset — so an OFF interval is a real measurement condition, not a gap.
 
 ## Repository layout
 
-    pi5/          Raspberry Pi 5 acquisition, control, and analysis
+    pi5/          Raspberry Pi 5 acquisition and control
+    analysis/     Visualization and the stimulus-decoding model
     firmware/     ESP32 / Arduino light-stimulus sketches
     sensors/      Standalone ambient-light sensor drivers
     experiments/  Earlier experiment runners (Arduino-protocol generation)
@@ -70,6 +71,48 @@ than reset — so an OFF interval is a real measurement condition, not a gap.
 - **`plot_myco_run.py`** — offline analysis. Renders a 2×2 figure, one subplot
   per electrode channel, each overlaid with a computed light-intensity curve and
   vertical lap markers.
+
+### `analysis/` — decoding the stimulus from the response
+
+The instrument answers "what does the substrate do when we shine light on it?"
+This code asks the inverse question: **given only the four electrode voltages,
+can we recover what the light was doing?** If a model can, the recorded signal
+carries real information about the stimulus rather than noise — which makes this
+a validation of the whole measurement chain, not just a curiosity.
+
+- **`train_brightness_fullrange_v4.py`** — two-stage model. A classifier
+  predicts whether the light is on; a regressor predicts brightness (0–100),
+  trained only on ON samples. Features are derived **exclusively** from the
+  `diff*` columns; the `flux` (photodiode) and `panel_on` columns are
+  deliberately excluded so the model cannot read the answer off a light sensor.
+- **`train_brightness_fullrange_v2.py`** — the earlier linear version
+  (logistic regression + ridge). Kept because the difference between the two is
+  the point; see below.
+- **`predict_brightness_fullrange_v4.py`** — inference. Smooths P(ON) with an
+  EMA, converts it to a stable ON mask via hysteresis (separate on/off
+  thresholds, so the state doesn't chatter at the boundary), then predicts
+  brightness on ON samples.
+- **`plot_myco_4diffs.py`** — 2×2 per-channel plot that shades the time regions
+  where each electrode wall is lit, so stimulus and response line up visually.
+
+**Why v4 exists.** v2 split the data chronologically across concatenated runs.
+In a 20 Hz time series, adjacent samples are nearly identical, so a split that
+lands mid-run puts near-duplicate rows on both sides and inflates the score.
+v4 replaces it with **leave-one-run-out cross-validation** — hold out an entire
+run, train on the others — which is the correct grouping for this data. v4 also
+adds per-run drift removal (rolling median/MAD), lag features for the
+substrate's response latency, and inverse-frequency bin weighting so the
+regressor doesn't collapse toward the mid-range.
+
+**Results, reported honestly.** On a held-out run the brightness regressor
+reaches **MAE ≈ 9.2** on a 0–100 scale. The relevant comparison is a
+predict-the-mean baseline, which scores MAE ≈ 24.3 on the same run — so the
+model captures substantial real structure.
+
+The ON/OFF presence metric looks near-perfect, but that number is not
+meaningful: the light is on for ~98% of samples under this protocol, so a model
+that always answers "on" scores ~98% too. Presence is trivial here; the
+brightness regression is the actual task.
 
 ### `firmware/`
 
@@ -152,5 +195,6 @@ this project.
 
 ## Notes
 
-Measurement data (run CSVs) is excluded from version control. Hardware
+Measurement data (run CSVs) and trained model artifacts (.joblib) are
+excluded from version control. Hardware
 integration on the lab Raspberry Pi 5 was handled by a teammate.
