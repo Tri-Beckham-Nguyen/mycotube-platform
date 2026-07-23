@@ -1,0 +1,17 @@
+# Experiment data - never publish research measurements
+runs/
+data/
+*.csv
+*.json
+!calibration_summary.example.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,6 @@
+spidev
+gpiod
+pyserial
+matplotlib
+numpy
+smbus2
